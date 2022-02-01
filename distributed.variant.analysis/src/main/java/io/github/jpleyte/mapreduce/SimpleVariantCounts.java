@@ -3,6 +3,7 @@ package io.github.jpleyte.mapreduce;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -18,8 +19,9 @@ import io.github.jpleyte.mapreduce.map.MapRunIdToVariant;
 import io.github.jpleyte.mapreduce.reduce.ReduceVariantToCount;
 
 /**
- * This is the main class of a MapReduce process that counts the number of times
- * each variant is seen across multiple runs.
+ * This is the main class for a simple MapReduce job that counts the number of
+ * variant calls in each run. MapReduce can't use arbitrary pojos, so the
+ * Variant instance is serialised and passed as BytesWriteable.
  * 
  * @author j
  *
@@ -46,16 +48,21 @@ public class SimpleVariantCounts extends Configured implements Tool {
 
 		job.setJarByClass(SimpleVariantCounts.class);
 
-		// The output key is a dbSNP id
-		job.setOutputKeyClass(Text.class);
+		// The Mapper maps the variant to its runId.
+		job.setMapperClass(MapRunIdToVariant.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(BytesWritable.class);
 
-		// The output value is the number of times the variant was encountered.
+		// The reducer counts the number of variant calls in the run and prints out the
+		// runId and count.
+		job.setReducerClass(ReduceVariantToCount.class);
+		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(IntWritable.class);
 
-		job.setMapperClass(MapRunIdToVariant.class);
-		job.setReducerClass(ReduceVariantToCount.class);
-
+		// Input is a line from the CSV file
 		job.setInputFormatClass(TextInputFormat.class);
+
+		// Final output is written as text to file
 		job.setOutputFormatClass(TextOutputFormat.class);
 
 		FileInputFormat.addInputPath(job, new Path(args[0]));

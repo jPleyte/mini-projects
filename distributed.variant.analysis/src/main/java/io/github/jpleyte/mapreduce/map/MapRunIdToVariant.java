@@ -1,13 +1,14 @@
 package io.github.jpleyte.mapreduce.map;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -16,15 +17,15 @@ import org.apache.log4j.Logger;
 import io.github.jpleyte.mapreduce.bean.Variant;
 
 /**
- * Map a CSV Text line to key=Variant, value=1
+ * Read asingle CSV ``Text`` line and output key=Variant with value=a count of
+ * one.The Variant class must be serialised as a ``BytesWritable`` byte array
+ * because Hadoop's MapReduce doesn't allow for passing of non-pojo objects.
  * 
  * @author j
  *
  */
-public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text/* Variant */, IntWritable> {
+public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text, BytesWritable> {
 	private static final Logger logger = Logger.getLogger(MapRunIdToVariant.class.getName());
-
-	private static AtomicInteger jDebugInt = new AtomicInteger();
 	private CSVFormat csvFormat;
 
 	private enum SimpleVariantCountsHeaders {
@@ -32,7 +33,7 @@ public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text/* Variant
 	}
 
 	@Override
-	protected void setup(Mapper<LongWritable, Text, Text/* Variant */, IntWritable>.Context context)
+	protected void setup(Mapper<LongWritable, Text, Text, BytesWritable>.Context context)
 			throws IOException, InterruptedException {		
 		super.setup(context);
 		csvFormat = CSVFormat.DEFAULT.builder().setHeader(SimpleVariantCountsHeaders.class).build();
@@ -40,13 +41,9 @@ public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text/* Variant
 	}
 	
 	/**
-	 * 
+	 * Read a CSV line, create a variant, and Map the variant to its runId 
 	 */
 	public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-		logger.debug("jDebug: key=" + key.get());
-
-		logger.error("jDebug: int=" + jDebugInt.incrementAndGet() + ", value=" + value.toString());
-
 		try(CSVParser parser = CSVParser.parse(value.toString(), csvFormat)) {
 			List<CSVRecord> records = parser.getRecords();
 
@@ -55,10 +52,18 @@ public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text/* Variant
 			}
 			
 			Variant variant = toVariant(records.get(0));
-			context.write(new Text(variant.getDbSnpId()), new IntWritable(1));
+			byte[] byVriant = serialise(variant);
+
+			context.write(new Text(variant.getRunId()), new BytesWritable(byVriant));
 		}
 	}
-	
+
+	/**
+	 * Convert a CSV row to a Variant
+	 * 
+	 * @param csvRecord
+	 * @return
+	 */
 	private Variant toVariant(CSVRecord csvRecord) {
 		Variant variant = new Variant();
 		variant.setRunId(csvRecord.get(SimpleVariantCountsHeaders.run_id));
@@ -70,5 +75,20 @@ public class MapRunIdToVariant extends Mapper<LongWritable, Text, Text/* Variant
 		variant.setDbSnpId(csvRecord.get(SimpleVariantCountsHeaders.db_snp_id));
 		variant.setSignificance(csvRecord.get(SimpleVariantCountsHeaders.significance));		
 		return variant;
-	}		
+	}
+
+	/**
+	 * Convert a Variant to a byte array
+	 * 
+	 * @param obj
+	 * @return
+	 * @throws IOException
+	 */
+	private byte[] serialise(Variant obj) throws IOException {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		ObjectOutputStream os = new ObjectOutputStream(out);
+		os.writeObject(obj);
+		return out.toByteArray();
+	}
+
 }

@@ -1,6 +1,8 @@
 package io.github.jpleyte.mapreduce.bean;
 
-public class Variant {
+import java.io.Serializable;
+
+public class Variant implements Serializable {
 	private String runId;
 	private String chromosome;
 	private int positionStart;

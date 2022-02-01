@@ -1,5 +1,6 @@
 # Distributed Variant Analysis
 
+This project has some examples of Hadoop's MapReduce jobs. 
 
 ## Setup
 
@@ -18,15 +19,18 @@ hadoop fs -ls /data/distributed_variant_analysis/input
 Specify profile with the name of the main class you want ot use. 
 
 ```
-mvn clean compile assembly:single -P SimpleVariantCounts0
+mvn clean compile assembly:single -P SimpleVariantCounts
 ```
+
+Possible profiles are:
+* SimpleVariantCounts - Count the number of variant calls from each run.
 
 
 
 **Running the application**
 
 ```
-hadoop fs -rmdir /data/distributed_variant_analysis/output
+hadoop fs -rm -r /data/distributed_variant_analysis/output
 hadoop jar target/distributed.variant.analysis-0.0.1-SNAPSHOT.jar \
 	/data/distributed_variant_analysis/input \
 	/data/distributed_variant_analysis/output
@@ -36,16 +40,13 @@ hadoop fs -cat /data/distributed_variant_analysis/output/part-r-00000
 
 ## Input File(s)
 
-Variant calls are specified in the CSV format: 
+Variant calls are specified in CSV format, with the following fields:
 
 ```
 run_id, chromosome, position_start, position_end, reference_base, variant_base, db_snp_id, significance
 ```
 
 Variants from multiple runs can be placed in a single file or divided into multiple files.   
-
-
-
 
 ## Sample Input
 
